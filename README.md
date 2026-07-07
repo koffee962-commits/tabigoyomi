@@ -26,19 +26,28 @@ npm run preview    # ビルド結果のプレビュー
 | `/my` | マイページ(お気に入り・旅行計画) |
 | `/city/:id` | 都市詳細(例: `/city/dps` = バリ島) |
 
-## 写真の追加方法
+## 写真
 
-都市カード・詳細ページのビジュアルは、写真が未設定の間はSVGイラストで表示されます。
-写真に差し替えるには:
+都市の写真は Wikimedia Commons (Wikipedia の各都市記事の代表画像) から取得しています。
 
-1. `public/photos/` に写真を置く(例: `dps.jpg`)
-2. `src/data.js` の該当都市に `photo` フィールドを追加する
-
-```js
-{ id:"dps", name:"バリ島", photo:"dps.jpg", ... },
+```bash
+node scripts/fetch-photos.mjs   # public/photos/<id>.jpg と src/photoCredits.js を再生成
 ```
 
-読み込みに失敗した場合は自動でSVGイラストにフォールバックします。
+- 出典・ライセンス情報は `src/photoCredits.js` に自動生成され、詳細ページの写真右下にクレジット表示されます
+- 代表画像が地図や旗などで不適切な都市は、`scripts/fetch-photos.mjs` の `TITLE_OVERRIDES` で記事名を指定します
+- 手持ちの写真に差し替えたい場合は `public/photos/<id>.jpg` を上書きし、`src/photoCredits.js` から該当都市のエントリを削除(クレジット表示が消えます)
+- 都市を追加したときは `src/data.js` に都市データを足してから上のスクリプトを再実行
+- 写真がない・読み込みに失敗した都市は自動でSVGイラストにフォールバックします
+
+## 本番URL(ドメイン)の変更
+
+独自ドメインへ移行するときは以下の2箇所を変更します。
+
+1. `src/data.js` の `SITE_ORIGIN` — canonical・OG・sitemap・robots がすべてここから生成されます
+2. `vite.config.js` の `base` — ドメイン直下で配信するなら `"/"` に変更
+
+あとは GitHub Pages のカスタムドメイン設定(または他ホスティングへの移行)を行うだけです。
 
 ## アフィリエイトIDの設定
 

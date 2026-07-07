@@ -18,7 +18,7 @@ const esc = (s) => s
 
 /* テンプレート内の <title>・meta description・canonical・OG タグを差し替え、
    必要なら JSON-LD を </head> 直前に挿入する */
-function renderPage({ title, description, url, ogType = "website", jsonLd = null }) {
+function renderPage({ title, description, url, ogType = "website", ogImage = null, jsonLd = null }) {
   let html = template;
   html = html.replace(/<title>[\s\S]*?<\/title>/, () => `<title>${esc(title)}</title>`);
   html = html.replace(/(<meta name="description" content=")[^"]*(")/, (_, a, b) => a + esc(description) + b);
@@ -27,6 +27,10 @@ function renderPage({ title, description, url, ogType = "website", jsonLd = null
   html = html.replace(/(<meta property="og:description" content=")[^"]*(")/, (_, a, b) => a + esc(description) + b);
   html = html.replace(/(<meta property="og:type" content=")[^"]*(")/, (_, a, b) => a + ogType + b);
   html = html.replace(/(<meta property="og:url" content=")[^"]*(")/, (_, a, b) => a + url + b);
+  if (ogImage) {
+    html = html.replace("</head>", () =>
+      `  <meta property="og:image" content="${ogImage}" />\n  </head>`);
+  }
   if (jsonLd) {
     html = html.replace("</head>", () =>
       `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n  </head>`);
@@ -39,6 +43,17 @@ const writePage = (relDir, html) => {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "index.html"), html);
 };
+
+/* トップページ: index.html にハードコードされた canonical/og:url を SITE_ORIGIN に合わせる
+   (ドメイン変更時は src/data.js の SITE_ORIGIN を直すだけでよい) */
+{
+  let html = template;
+  html = html.replace(/(<link rel="canonical" href=")[^"]*(")/, (_, a, b) => a + SITE_ORIGIN + b);
+  html = html.replace(/(<meta property="og:url" content=")[^"]*(")/, (_, a, b) => a + SITE_ORIGIN + b);
+  html = html.replace("</head>", () =>
+    `  <meta property="og:image" content="${SITE_ORIGIN}photos/dps.jpg" />\n  </head>`);
+  writeFileSync(join(dist, "index.html"), html);
+}
 
 /* 一覧ページ(/month, /my) */
 for (const route of ["/month", "/my"]) {
@@ -55,8 +70,9 @@ for (const c of CITIES) {
   const title = cityTitle(c);
   const description = cityDescription(c);
   const url = `${SITE_ORIGIN}city/${c.id}/`;
+  const ogImage = `${SITE_ORIGIN}photos/${c.id}.jpg`;
   writePage(`city/${c.id}`, renderPage({
-    title, description, url, ogType: "article",
+    title, description, url, ogType: "article", ogImage,
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "TouristDestination",
@@ -64,6 +80,7 @@ for (const c of CITIES) {
       alternateName: c.en,
       description,
       url,
+      image: ogImage,
     },
   }));
 }

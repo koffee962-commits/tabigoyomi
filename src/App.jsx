@@ -6,6 +6,7 @@ import {
   ROUTE_META, cityTitle, cityDescription,
 } from "./data.js";
 import { linksFor } from "./affiliates.js";
+import { PHOTO_CREDITS } from "./photoCredits.js";
 
 /* ── 旅ごよみ ─ 世界の旅先、いちばんいい季節がひと目でわかる ── */
 
@@ -215,13 +216,15 @@ function Hero({ city, h = 88, fill }) {
   );
 }
 
-/* 都市ビジュアル: photo が設定されていれば写真、なければ(または読込失敗時は)SVGにフォールバック */
+/* 都市ビジュアル: 写真(photos/<id>.jpg、出典はphotoCredits.js)があれば写真、
+   なければ(または読込失敗時は)SVGにフォールバック */
 function CityVisual({ city, h = 88, fill }) {
   const [err, setErr] = useState(false);
-  if (city.photo && !err) {
+  const photo = city.photo || (PHOTO_CREDITS[city.id] ? `${city.id}.jpg` : null);
+  if (photo && !err) {
     return (
-      <img src={import.meta.env.BASE_URL + "photos/" + city.photo} alt=""
-        onError={() => setErr(true)}
+      <img src={import.meta.env.BASE_URL + "photos/" + photo} alt=""
+        onError={() => setErr(true)} loading="lazy"
         style={{ width:"100%", height: fill ? "100%" : h, objectFit:"cover", display:"block" }} />
     );
   }
@@ -250,7 +253,7 @@ const Tag = ({ children, tone }) => (
 );
 
 /* ── 詳細画面 ── */
-function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, onAddPlan, loggedIn }) {
+function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, onAddPlan }) {
   const [memoText, setMemoText] = useState(memo || "");
   const [saved, setSaved] = useState(false);
   const nowYear = new Date().getFullYear();
@@ -282,6 +285,13 @@ function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, 
           <h2 style={{ fontFamily:"'Shippori Mincho', serif", fontSize:30, margin:"2px 0 0",
             textShadow:"0 1px 10px rgba(0,0,0,0.3)" }}>{city.name}</h2>
         </div>
+        {PHOTO_CREDITS[city.id] && (
+          <a href={PHOTO_CREDITS[city.id].filePage} target="_blank" rel="noopener"
+            style={{ position:"absolute", right:10, bottom:8, fontSize:9, color:"rgba(255,255,255,0.75)",
+              textDecoration:"none", background:"rgba(18,32,42,0.35)", padding:"2px 7px", borderRadius:999 }}>
+            📷 {PHOTO_CREDITS[city.id].author.slice(0, 24)} / {PHOTO_CREDITS[city.id].license} (Wikimedia)
+          </a>
+        )}
       </div>
       <div style={{ marginTop:10 }}>
         <Tag tone="amber">ベストシーズン {city.best}</Tag>
@@ -344,7 +354,7 @@ function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, 
       {/* 旅行計画に追加 */}
       <div style={{ background:"#fff", borderRadius:14, padding:16, marginTop:12, border:"1px solid #E2E8E9" }}>
         <div style={{ fontSize:12, fontWeight:700, color:"#5C7680", marginBottom:10, letterSpacing:1 }}>旅行計画に追加</div>
-        {loggedIn ? (
+        {(
           <>
             <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
               <select value={py} onChange={e=>setPy(+e.target.value)} style={{
@@ -370,15 +380,13 @@ function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, 
               (この月の料金レベル: <b style={{ color:PRICE[+PRICES[city.id][pm-1]].color }}>{PRICE[+PRICES[city.id][pm-1]].label}</b>)
             </div>
           </>
-        ) : (
-          <div style={{ fontSize:12, color:"#8AA0A8" }}>マイページにログインすると、旅行計画に追加できます。</div>
         )}
       </div>
 
       {/* メモ */}
       <div style={{ background:"#fff", borderRadius:14, padding:16, marginTop:12, border:"1px solid #E2E8E9" }}>
         <div style={{ fontSize:12, fontWeight:700, color:"#5C7680", marginBottom:10, letterSpacing:1 }}>自分用メモ</div>
-        {loggedIn ? (
+        {(
           <>
             <textarea value={memoText} onChange={e=>{setMemoText(e.target.value); setSaved(false);}}
               placeholder="例: 友人と行く候補。ナーダム祭に合わせて7月上旬に休みを取る"
@@ -390,8 +398,6 @@ function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, 
               {saved ? "✓ 保存しました" : "メモを保存"}
             </button>
           </>
-        ) : (
-          <div style={{ fontSize:12, color:"#8AA0A8" }}>マイページにログインすると、メモを保存できます。</div>
         )}
       </div>
 
@@ -577,7 +583,6 @@ export default function App() {
 
         {selected ? (
           <Detail key={selected.id} city={selected} onBack={backToList} nowMonth={nowMonth}
-            loggedIn={!!store.user}
             isFav={store.favs.includes(selected.id)}
             onToggleFav={() => toggleFav(selected.id)}
             memo={store.memos[selected.id]}
@@ -628,7 +633,7 @@ export default function App() {
                 ) : (
                 <div style={{ display:"grid", gap:10 }}>
                   {destList.map(c => <Card key={c.id} city={c} nowMonth={nowMonth} onOpen={openCity}
-                    isFav={store.favs.includes(c.id)} onToggleFav={store.user ? toggleFav : null} />)}
+                    isFav={store.favs.includes(c.id)} onToggleFav={toggleFav} />)}
                   {!destList.length && (
                     <div style={{ textAlign:"center", padding:40, color:"#8AA0A8", fontSize:13 }}>
                       該当する旅先が見つかりません。条件を変えてみてください。
@@ -660,7 +665,7 @@ export default function App() {
                 <div style={{ display:"grid", gap:10 }}>
                   {monthList.map(({ c, rating, spot }) => (
                     <Card key={c.id} city={c} nowMonth={month} onOpen={openCity}
-                      isFav={store.favs.includes(c.id)} onToggleFav={store.user ? toggleFav : null}
+                      isFav={store.favs.includes(c.id)} onToggleFav={toggleFav}
                       reason={spot ? `${month}月: ${spot.n}` : rating === 3 ? "気候ベスト" : "快適に過ごせる"} />
                   ))}
                 </div>
@@ -669,34 +674,13 @@ export default function App() {
 
             {tab === "my" && (
               <div style={{ animation:"fadeIn .25s ease" }}>
-                {!store.user ? (
-                  <div style={{ background:"#fff", borderRadius:14, padding:"32px 24px", textAlign:"center",
-                    border:"1px solid #E2E8E9" }}>
-                    <h3 style={{ fontFamily:"'Shippori Mincho', serif", fontSize:18, color:"#17313B", margin:"0 0 8px" }}>
-                      マイページ
-                    </h3>
-                    <p style={{ fontSize:13, color:"#5C7680", lineHeight:1.9, margin:"0 0 20px" }}>
-                      お気に入りの保存・メモ・旅行計画と<br/>年間予算の管理ができます。
-                    </p>
-                    <button onClick={() => update({ user: { name: "デモユーザー" } })} style={{
-                      padding:"12px 28px", borderRadius:8, border:"1px solid #D7E0E2", cursor:"pointer",
-                      background:"#fff", fontFamily:"inherit", fontSize:14, fontWeight:600, color:"#33484F",
-                      display:"inline-flex", alignItems:"center", gap:10 }}>
-                      <span style={{ fontFamily:"'IBM Plex Mono', monospace", fontWeight:600, fontSize:15,
-                        color:"#4285F4" }}>G</span>
-                      Google でログイン
-                    </button>
-                    <p style={{ fontSize:10, color:"#A9BCC2", marginTop:14 }}>
-                      プロトタイプではデモログインです。公開版でGoogle認証に置き換えます。
-                    </p>
-                  </div>
-                ) : (
+                {(
                   <>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:"#17313B" }}>{store.user.name}</div>
-                      <button onClick={() => update({ user:null })} style={{
-                        background:"none", border:"none", color:"#8AA0A8", fontSize:12,
-                        cursor:"pointer", fontFamily:"inherit" }}>ログアウト</button>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:"#17313B" }}>マイページ</div>
+                      <div style={{ fontSize:10, color:"#A9BCC2" }}>
+                        お気に入り・メモ・旅行計画はこの端末のブラウザに保存されます
+                      </div>
                     </div>
 
                     {/* 旅行計画と年間予算 */}
