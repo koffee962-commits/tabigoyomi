@@ -48,6 +48,12 @@ export const PHOTO_CREDITS = {
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "filePage": "https://commons.wikimedia.org/wiki/File:TanahLot_2014.JPG"
   },
+  "mle": {
+    "author": "Shahee Ilyas",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Mal%C3%A9.jpg"
+  },
   "uln": {
     "author": "Zazaa Mongolia",
     "license": "CC BY-SA 4.0",
@@ -90,6 +96,12 @@ export const PHOTO_CREDITS = {
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
     "filePage": "https://commons.wikimedia.org/wiki/File:Evening_light_over_Barcelona.jpg"
   },
+  "rkv": {
+    "author": "Olga Ernst",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Reykjav%C3%ADk,_view_from_Hallgr%C3%ADmskirkja_(2).jpg"
+  },
   "hnl": {
     "author": "Pickle the cool",
     "license": "CC BY-SA 4.0",
@@ -108,6 +120,36 @@ export const PHOTO_CREDITS = {
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "filePage": "https://commons.wikimedia.org/wiki/File:Hollywood_Sign_(Zuschnitt).jpg"
   },
+  "cun": {
+    "author": "dronepicr",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Cancun_Strand_Luftbild_(22143397586).jpg"
+  },
+  "cuz": {
+    "author": "Draceane",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Machu_Picchu,_2023_(012).jpg"
+  },
+  "uyu": {
+    "author": "Anouchka Unel",
+    "license": "FAL",
+    "licenseUrl": "http://artlibre.org/licence/lal/en",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Salar_Uyuni_au01.jpg"
+  },
+  "rio": {
+    "author": "Rafael Rabello de Barros",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Cidade_Maravilhosa.jpg"
+  },
+  "bue": {
+    "author": "leonardo samrani from rosario, argentina",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Avenida_9_de_Julio,_Buenos_Aires_(40089810910).jpg"
+  },
   "syd": {
     "author": "Benh LIEU SONG (Flickr)",
     "license": "CC BY-SA 4.0",
@@ -119,5 +161,35 @@ export const PHOTO_CREDITS = {
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "filePage": "https://commons.wikimedia.org/wiki/File:Cairns_(Queensland)_(cropped).jpg"
+  },
+  "zqn": {
+    "author": "Bernard Spragg. NZ from Christchurch, New Zealand",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Queenstown_1_(8168013172).jpg"
+  },
+  "mrk": {
+    "author": "Acp",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Pavillon_Menarag%C3%A4rten.jpg"
+  },
+  "cai": {
+    "author": "Jorge Láscar from Melbourne, Australia",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Cairo_Opera_House,_Al_Hurriyah_Park_and_the_Nile_river_(14797782354).jpg"
+  },
+  "cpt": {
+    "author": "Der Berzerker from Washington, DC, USA",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Camps_bay_(53460319478)_(cropped).jpg"
+  },
+  "znz": {
+    "author": "No machine-readable author provided. Mbz1 assumed (based on copyright claims).",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Zanzibar_sultan_palace.jpg"
   }
 };

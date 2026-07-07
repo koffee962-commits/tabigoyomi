@@ -18,6 +18,11 @@ const TITLE_OVERRIDES = {
   nyc: "New York City",
   hkg: "Victoria Harbour",   // 香港(記事の代表画像が旗のため夜景に)
   sin: "Marina Bay Sands",   // シンガポール(記事の代表画像が旗のため湾岸の夜景に)
+  uyu: "Salar de Uyuni",     // ウユニ(街ではなく塩湖の絶景を)
+  zqn: "Queenstown, New Zealand", // クイーンズタウン(曖昧さ回避ページを避ける)
+  mle: "Malé",               // モルディブ(国記事は旗になるため)
+  cuz: "Machu Picchu",       // クスコ(いちばんの目的地マチュピチュを)
+  znz: "Stone Town",         // ザンジバル(島記事は旗になるため世界遺産の旧市街を)
 };
 
 const BAD = /(map|locator|marker|flag|montage|collage|seal|logo|coat_of_arms)/i;
