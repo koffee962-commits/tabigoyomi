@@ -9,13 +9,19 @@
 
 ```bash
 npm install        # 依存パッケージのインストール
-npm run dev        # 開発サーバー起動 (http://localhost:5173/)
+npm run dev        # フロントの開発サーバー (http://localhost:5173/)
+npm run dev:api    # APIの開発サーバー (wrangler dev, http://127.0.0.1:8787/)
 npm run build      # 本番ビルド (vite build + scripts/postbuild.mjs)
 npm run preview    # ビルド結果のプレビュー
 ```
 
+マイページを触るときは `npm run dev` と `npm run dev:api` を**両方**起動してください。
+Viteの `server.proxy` が `/api/*` を wrangler dev(8787番)へ転送するので、
+ブラウザは http://localhost:5173/ だけを見ていれば済みます。
+
 `npm run build` はビルド後に `scripts/postbuild.mjs` を実行し、
 都市ごとのSEO用HTML(`dist/city/<id>/index.html`)・`sitemap.xml`・`robots.txt`・`404.html` を生成します。
+`npm run dev:api` は `dist/` を静的アセットとして配信するため、先に一度 `npm run build` が必要です。
 
 ## ページ構成
 
@@ -23,8 +29,97 @@ npm run preview    # ビルド結果のプレビュー
 | --- | --- |
 | `/` | 行き先から探す(一覧・地図) |
 | `/month` | 月から探す |
-| `/my` | マイページ(お気に入り・旅行計画) |
+| `/my` | マイページ(ログイン必須。お気に入り・メモ・旅行計画) |
 | `/city/:id` | 都市詳細(例: `/city/dps` = バリ島) |
+
+## マイページ(ログインとデータ保存)
+
+マイページのお気に入り・メモ・旅行計画は、Googleアカウントでログインした
+ユーザーごとに **Cloudflare D1** へ保存されます(以前はブラウザの localStorage でした)。
+以前この端末に保存されていた内容は、**初回ログイン時に自動でサーバーへ引き継ぎ**、
+取り込みが済んだら localStorage のキー(`tabigoyomi:v1`)を削除します。
+
+### 構成
+
+| ファイル | 役割 |
+| --- | --- |
+| `src/worker/index.js` | `/api/*` を処理するWorker(OAuth・セッション・データ入出力) |
+| `src/api.js` | フロントからAPIを呼ぶための薄いラッパー |
+| `migrations/0001_init.sql` | D1のスキーマ(`users` / `sessions` / `user_data`) |
+
+`wrangler.jsonc` の `assets.run_worker_first` を `["/api/*"]` にしているため、
+**Workerが動くのは `/api/*` だけ**です。それ以外のURLはこれまで通り静的アセットが優先され、
+実在しないURLは `not_found_handling: "404-page"` により404を返します。
+
+### APIエンドポイント
+
+| メソッド | パス | 内容 |
+| --- | --- | --- |
+| GET | `/api/auth/google` | stateを発行してGoogleの認可画面へリダイレクト |
+| GET | `/api/auth/callback` | stateを照合 → トークン交換 → IDトークン検証 → セッション作成 → `/my` へ |
+| POST | `/api/auth/logout` | セッション破棄 |
+| GET | `/api/me` | ログイン中のユーザー(未ログインは401) |
+| GET | `/api/data` | `{ favs, memos, plans }` の取得 |
+| PUT | `/api/data` | `{ favs, memos, plans }` の保存(ユーザー単位で全置換) |
+
+セッションはHttpOnly Cookie(`Secure; SameSite=Lax; Path=/`)で管理し、
+DBにはCookie値そのものではなくSHA-256ハッシュだけを保存しています。
+`/api/data` は必ずCookieのセッションからユーザーを特定するため、
+リクエストの本文にユーザーIDを書いても無視されます。
+
+## Google OAuth の設定
+
+Google Cloud Console で「OAuth 2.0 クライアント ID」(種類: ウェブアプリケーション)を作成し、
+**承認済みのリダイレクト URI** に次の2つを登録します。
+
+```
+https://tabigoyomi.com/api/auth/callback
+http://localhost:5173/api/auth/callback
+```
+
+### 本番(Cloudflare)へのシークレット設定
+
+```bash
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+シークレットはリポジトリに置きません。未設定のあいだもサイトはこれまで通り動き、
+`/api/auth/google` は「ログインの準備中です」という案内ページを返します。
+
+### ローカル開発用
+
+`.dev.vars.example` を `.dev.vars` にコピーして値を入れてください(`.dev.vars` はGit管理外です)。
+
+```ini
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+OAUTH_REDIRECT_URI="http://localhost:5173/api/auth/callback"
+```
+
+`OAUTH_REDIRECT_URI` は任意です。未設定の場合はリクエストのオリジンから
+`<オリジン>/api/auth/callback` を組み立てます(本番では設定不要)。
+
+## D1 (データベース)
+
+| 項目 | 値 |
+| --- | --- |
+| データベース名 | `tabigoyomi-db` |
+| database_id | `bb7c07e2-337a-4aeb-9ef1-d9d57c0a68f1` |
+| バインディング | `DB` |
+
+新しく作り直す場合は `npx wrangler d1 create tabigoyomi-db` を実行し、
+返ってきた `database_id` を `wrangler.jsonc` に書き写してください。
+
+### マイグレーション
+
+```bash
+npm run db:migrate         # 本番(リモート)のD1へ適用
+npm run db:migrate:local   # ローカル(wrangler dev用)のD1へ適用
+```
+
+中身は `npx wrangler d1 execute tabigoyomi-db --remote --file=./migrations/0001_init.sql` です。
+スキーマは `CREATE TABLE IF NOT EXISTS` なので、何度実行しても安全です。
 
 ## 写真
 
@@ -70,6 +165,7 @@ export const AFFILIATES = {
 
 ```bash
 npm run build          # 先にビルドが必要(dist/ を配信するため)
+npm run db:migrate     # 初回のみ: D1にテーブルを作成
 npx wrangler deploy    # Cloudflare へ公開
 ```
 

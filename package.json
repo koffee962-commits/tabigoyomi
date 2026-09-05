@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "npx wrangler dev --port 8787",
     "build": "vite build && node scripts/postbuild.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "npx wrangler d1 execute tabigoyomi-db --remote --file=./migrations/0001_init.sql",
+    "db:migrate:local": "npx wrangler d1 execute tabigoyomi-db --local --file=./migrations/0001_init.sql"
   },
   "dependencies": {
     "react": "^18.3.1",

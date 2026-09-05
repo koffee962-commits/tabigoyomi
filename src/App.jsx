@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate, matchPath, Navigate } from "react-router-dom";
 import {
   RATING, PRICE, PRICES, GEO, TOKYO, LAND, SEAS, REGIONS, MONTH_NAMES, CITIES,
@@ -7,6 +7,7 @@ import {
 } from "./data.js";
 import { linksFor } from "./affiliates.js";
 import { PHOTO_CREDITS } from "./photoCredits.js";
+import { LOGIN_URL, getMe, getData, putData, postLogout } from "./api.js";
 
 /* ── 旅ごよみ ─ 世界の旅先、いちばんいい季節がひと目でわかる ── */
 
@@ -256,6 +257,10 @@ const Tag = ({ children, tone }) => (
 function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, onAddPlan }) {
   const [memoText, setMemoText] = useState(memo || "");
   const [saved, setSaved] = useState(false);
+  /* メモはサーバーから遅れて届くことがあるので、未編集なら受け取った内容を反映する */
+  useEffect(() => {
+    setMemoText(prev => (prev === (memo || "") ? prev : (memo || "")));
+  }, [memo]);
   const nowYear = new Date().getFullYear();
   const [py, setPy] = useState(nowYear);
   const [pm, setPm] = useState(bargainMonths(city)[0] || (city.months.indexOf("3") + 1) || 1);
@@ -392,7 +397,7 @@ function Detail({ city, onBack, nowMonth, isFav, onToggleFav, memo, onSaveMemo, 
               placeholder="例: 友人と行く候補。ナーダム祭に合わせて7月上旬に休みを取る"
               rows={3} style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid #D7E0E2",
                 fontFamily:"inherit", fontSize:13, resize:"vertical", background:"#FAFCFC" }} />
-            <button onClick={() => { onSaveMemo(memoText); setSaved(true); }} style={{
+            <button onClick={() => { if (onSaveMemo(memoText) !== false) setSaved(true); }} style={{
               marginTop:8, padding:"8px 16px", borderRadius:8, border:"none", cursor:"pointer",
               background: saved ? "#2E9E5B" : "#17313B", color:"#fff", fontFamily:"inherit", fontSize:12, fontWeight:700 }}>
               {saved ? "✓ 保存しました" : "メモを保存"}
@@ -469,6 +474,42 @@ function Card({ city, nowMonth, onOpen, reason, isFav, onToggleFav }) {
   );
 }
 
+/* ── Googleのブランドマーク(ログインボタン用) ── */
+const GoogleMark = () => (
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true"
+    style={{ background:"#fff", borderRadius:3, padding:2, flexShrink:0 }}>
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+  </svg>
+);
+
+/* ── マイページのデータ ──
+   以前はこの端末の localStorage に置いていたが、いまはログインしたアカウントに
+   ひもづけてサーバー(Cloudflare D1)へ保存する。LEGACY_KEY は初回ログイン時の
+   引き継ぎ元としてのみ参照し、取り込みが済んだら削除する。 */
+const LEGACY_KEY = "tabigoyomi:v1";
+const emptyData = () => ({ favs: [], memos: {}, plans: [] });
+
+const isEmptyData = (d) =>
+  !d || ((d.favs || []).length === 0 &&
+    Object.keys(d.memos || {}).length === 0 &&
+    (d.plans || []).length === 0);
+
+function readLegacyData() {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return {
+      favs: Array.isArray(p.favs) ? p.favs : [],
+      memos: p.memos && typeof p.memos === "object" && !Array.isArray(p.memos) ? p.memos : {},
+      plans: Array.isArray(p.plans) ? p.plans : [],
+    };
+  } catch { return null; }
+}
+
 export default function App() {
   const nowMonth = new Date().getMonth() + 1;
   const location = useLocation();
@@ -499,41 +540,153 @@ export default function App() {
     if (el) el.setAttribute("content", meta.description);
   }, [path, selected]);
 
-  /* マイページのデータ(お気に入り・メモ・計画)は localStorage に保存 */
-  const [store, setStore] = useState({ user:null, favs:[], memos:{}, plans:[] });
+  /* トースト通知 */
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg) => setToast({ msg, key: Date.now() }), []);
   useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  /* ── ログイン状態 + マイページのデータ(サーバー保存) ── */
+  const [auth, setAuth] = useState({ status:"loading", user:null }); // loading | guest | in
+  const [store, setStore] = useState(emptyData);
+  const [dataReady, setDataReady] = useState(false);
+  const loggedIn = auth.status === "in";
+
+  const pendingRef = useRef(null);   // 保存待ちの内容
+  const saveTimerRef = useRef(null); // debounceのタイマー
+
+  /* 保存待ちをサーバーへ送る */
+  const flush = useCallback(async () => {
+    const data = pendingRef.current;
+    if (!data) return;
+    pendingRef.current = null;
     try {
-      const r = localStorage.getItem("tabigoyomi:v1");
-      if (r) setStore(s => ({ ...s, ...JSON.parse(r) }));
-    } catch (e) { /* 初回はデータなし */ }
-  }, []);
+      await putData(data);
+    } catch (e) {
+      if (e.status === 401) {
+        setAuth({ status:"guest", user:null });
+        setDataReady(false);
+        showToast("ログインの期限が切れました。もう一度ログインしてください");
+      } else {
+        showToast("保存できませんでした。通信環境をご確認ください");
+      }
+    }
+  }, [showToast]);
+
+  /* 画面には即座に反映し、書き込みは500msまとめてから送る(連打対策) */
   const update = (patch) => {
-    setStore(prev => {
-      const next = { ...prev, ...patch };
-      try { localStorage.setItem("tabigoyomi:v1", JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
+    const next = { ...store, ...patch };
+    setStore(next);
+    pendingRef.current = next;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(flush, 500);
   };
+
+  /* 起動時: ログイン状態の判定 → データ取得 → 端末に残っていたデータの引き継ぎ */
+  const bootedRef = useRef(false);
+  useEffect(() => {
+    if (bootedRef.current) return; // React StrictModeの二重実行を避ける
+    bootedRef.current = true;
+    let alive = true;
+    (async () => {
+      let user;
+      try {
+        ({ user } = await getMe());
+      } catch (e) {
+        if (!alive) return;
+        setAuth({ status:"guest", user:null });
+        if (e.status !== 401) showToast("サーバーに接続できませんでした");
+        return;
+      }
+      if (!alive) return;
+      setAuth({ status:"in", user });
+
+      let server;
+      try {
+        server = await getData();
+      } catch {
+        if (!alive) return;
+        setDataReady(true);
+        showToast("データを読み込めませんでした。時間をおいてお試しください");
+        return;
+      }
+      if (!alive) return;
+
+      const local = readLegacyData();
+      const takeOver = isEmptyData(server) && !isEmptyData(local);
+      setStore(takeOver ? local : server);
+      setDataReady(true);
+      if (takeOver) {
+        try {
+          await putData(local);
+          try { localStorage.removeItem(LEGACY_KEY); } catch { /* 消せなくても実害なし */ }
+          showToast("この端末に保存していた内容を引き継ぎました");
+        } catch {
+          showToast("端末に残っていた内容を引き継げませんでした");
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [showToast]);
+
+  /* 保存待ちを残したまま画面を離れないように、離脱時は即送信する */
+  useEffect(() => {
+    const flushNow = () => {
+      if (!pendingRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      flush();
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flushNow(); };
+    window.addEventListener("pagehide", flushNow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearTimeout(saveTimerRef.current);
+    };
+  }, [flush]);
+
+  /* 未ログインで保存操作をしたときの案内 */
+  const requireLogin = (what) => {
+    showToast(`${what}にはログインが必要です`);
+    if (path !== "/my") navigate("/my");
+    return false;
+  };
+
+  const doLogout = async () => {
+    clearTimeout(saveTimerRef.current);
+    if (pendingRef.current) await flush();
+    try { await postLogout(); } catch { /* Cookieが無効なら実質ログアウト済み */ }
+    setAuth({ status:"guest", user:null });
+    setStore(emptyData());
+    setDataReady(false);
+    showToast("ログアウトしました");
+  };
+
   const toggleFav = (id) => {
+    if (!loggedIn) return requireLogin("お気に入りの保存");
     const adding = !store.favs.includes(id);
     update({ favs: adding ? [...store.favs, id] : store.favs.filter(x => x !== id) });
     showToast(adding ? "お気に入りに追加しました" : "お気に入りから外しました");
   };
   const addPlan = (p) => {
+    if (!loggedIn) return requireLogin("旅行計画の保存");
     update({ plans: [...store.plans, { ...p, id: Date.now() }] });
     const c = CITIES.find(x => x.id === p.cid);
     showToast(`${p.y}年${p.mo}月・${c.name}を計画に追加しました`);
   };
-  const removePlan = (id) => update({ plans: store.plans.filter(p => p.id !== id) });
-
-  /* トースト通知 */
-  const [toast, setToast] = useState(null);
-  const showToast = (msg) => setToast({ msg, key: Date.now() });
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2200);
-    return () => clearTimeout(t);
-  }, [toast]);
+  const removePlan = (id) => {
+    if (!loggedIn) return requireLogin("旅行計画の編集");
+    update({ plans: store.plans.filter(p => p.id !== id) });
+  };
+  const saveMemo = (cid, text) => {
+    if (!loggedIn) return requireLogin("メモの保存");
+    update({ memos: { ...store.memos, [cid]: text } });
+    showToast("メモを保存しました");
+  };
 
   const sortedPlans = useMemo(() =>
     [...store.plans].sort((a, b) => (a.y - b.y) || (a.mo - b.mo)), [store.plans]);
@@ -586,7 +739,7 @@ export default function App() {
             isFav={store.favs.includes(selected.id)}
             onToggleFav={() => toggleFav(selected.id)}
             memo={store.memos[selected.id]}
-            onSaveMemo={(text) => { update({ memos: { ...store.memos, [selected.id]: text } }); showToast("メモを保存しました"); }}
+            onSaveMemo={(text) => saveMemo(selected.id, text)}
             onAddPlan={addPlan} />
         ) : (
           <>
@@ -674,12 +827,58 @@ export default function App() {
 
             {tab === "my" && (
               <div style={{ animation:"fadeIn .25s ease" }}>
-                {(
+                {auth.status === "loading" || (loggedIn && !dataReady) ? (
+                  <div style={{ textAlign:"center", padding:44, color:"#8AA0A8", fontSize:13,
+                    background:"#fff", borderRadius:14, border:"1px solid #E2E8E9" }}>
+                    読み込んでいます…
+                  </div>
+                ) : !loggedIn ? (
+                  /* ── 未ログイン: ログイン画面 ── */
+                  <div style={{ background:"#fff", borderRadius:14, border:"1px solid #E2E8E9",
+                    padding:"30px 20px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+                    <div style={{ fontFamily:"'Shippori Mincho', serif", fontSize:20, color:"#17313B",
+                      letterSpacing:2 }}>マイページ</div>
+                    <p style={{ fontSize:13, lineHeight:2, color:"#5C7680", margin:"12px 0 0" }}>
+                      お気に入り・メモ・旅行計画は、ログインしたアカウントにお預かりします。<br />
+                      どの端末からでも、同じ旅の計画をひらけます。
+                    </p>
+                    <a href={LOGIN_URL} style={{
+                      display:"inline-flex", alignItems:"center", justifyContent:"center", gap:10,
+                      marginTop:20, padding:"13px 24px", borderRadius:10, background:"#17313B",
+                      color:"#fff", fontSize:14, fontWeight:700, textDecoration:"none",
+                      boxShadow:"0 2px 8px rgba(23,49,59,.18)" }}>
+                      <GoogleMark />Googleでログイン
+                    </a>
+                    <p style={{ fontSize:11, color:"#A9BCC2", margin:"16px 0 0", lineHeight:1.9 }}>
+                      お名前とメールアドレスのみをお預かりします。<br />
+                      これまでこの端末に保存していた内容は、初回のログイン時に引き継がれます。
+                    </p>
+                  </div>
+                ) : (
                   <>
+                    {/* ログイン中のアカウント */}
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                      gap:12, marginBottom:12, background:"#fff", borderRadius:14,
+                      border:"1px solid #E2E8E9", padding:"12px 14px" }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontSize:10, color:"#A9BCC2", letterSpacing:1 }}>ログイン中</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#17313B", overflow:"hidden",
+                          textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {auth.user?.name || "旅人"} さん
+                        </div>
+                      </div>
+                      <button onClick={doLogout} style={{
+                        flexShrink:0, padding:"9px 15px", borderRadius:8, cursor:"pointer",
+                        border:"1px solid #D7E0E2", background:"#fff", color:"#5C7680",
+                        fontFamily:"inherit", fontSize:12, fontWeight:700 }}>
+                        ログアウト
+                      </button>
+                    </div>
+
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14 }}>
                       <div style={{ fontSize:14, fontWeight:700, color:"#17313B" }}>マイページ</div>
                       <div style={{ fontSize:10, color:"#A9BCC2" }}>
-                        お気に入り・メモ・旅行計画はこの端末のブラウザに保存されます
+                        お気に入り・メモ・旅行計画はアカウントに保存されます
                       </div>
                     </div>
 
@@ -801,8 +1000,9 @@ export default function App() {
         <div key={toast.key} style={{
           position:"fixed", bottom:28, left:"50%", transform:"translate(-50%, 0)",
           background:"#17313B", color:"#fff", fontSize:13, fontWeight:600,
-          padding:"12px 20px", borderRadius:999, boxShadow:"0 4px 16px rgba(23,49,59,.25)",
-          zIndex:100, whiteSpace:"nowrap", animation:"toastIn 2.2s ease forwards" }}>
+          padding:"12px 20px", borderRadius:18, boxShadow:"0 4px 16px rgba(23,49,59,.25)",
+          zIndex:100, width:"max-content", maxWidth:"min(calc(100vw - 32px), 440px)",
+          textAlign:"center", lineHeight:1.7, animation:"toastIn 2.8s ease forwards" }}>
           {toast.msg}
         </div>
       )}

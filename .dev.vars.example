@@ -1,0 +1,10 @@
+# ローカル開発用のシークレット雛形。
+# このファイルを `.dev.vars` にコピーして値を入れてください(.dev.vars はGit管理外です)。
+# 本番へは `npx wrangler secret put <名前>` で設定します。
+
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+# ローカルではViteの5173番でOAuthを完結させるため、リダイレクトURIを明示します。
+# 本番(tabigoyomi.com)では未設定でよく、リクエストのオリジンから自動生成されます。
+OAUTH_REDIRECT_URI="http://localhost:5173/api/auth/callback"

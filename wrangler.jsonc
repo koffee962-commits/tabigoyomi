@@ -1,12 +1,33 @@
 {
   "name": "tabigoyomi",
   "compatibility_date": "2026-07-07",
+
+  // APIだけを担当するWorker(src/worker/index.js)。サイト本体は静的アセット配信のまま
+  "main": "./src/worker/index.js",
+
   "assets": {
     "directory": "./dist",
+    // Workerから静的アセットへ委ねるためのバインディング
+    "binding": "ASSETS",
     // 実在ルート(/, /month, /my, /city/<id>)はビルド時にHTMLを生成済みなので、
     // それ以外のURLは 404.html を404ステータスで返す(存在しないURLを200にしない)
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // /api/* のみWorkerを先に実行する。それ以外は従来どおり静的アセットが優先される
+    "run_worker_first": ["/api/*"]
   },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tabigoyomi-db",
+      "database_id": "bb7c07e2-337a-4aeb-9ef1-d9d57c0a68f1"
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  },
+
   "routes": [
     { "pattern": "tabigoyomi.com", "custom_domain": true },
     { "pattern": "www.tabigoyomi.com", "custom_domain": true }
