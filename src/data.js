@@ -428,7 +428,7 @@ export const CITIES = [
 ];
 
 /* ── SEO用メタ情報(App と scripts/postbuild.mjs で共用) ── */
-export const SITE_ORIGIN = "https://koffee962-commits.github.io/tabigoyomi/";
+export const SITE_ORIGIN = "https://tabigoyomi.com/";
 export const SITE_NAME = "旅ごよみ";
 export const SITE_TITLE = "旅ごよみ | 海外旅行のベストシーズン検索";
 export const SITE_DESCRIPTION =

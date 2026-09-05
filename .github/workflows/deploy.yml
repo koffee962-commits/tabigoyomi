@@ -1,4 +1,7 @@
-name: Deploy to GitHub Pages
+name: Redirect old GitHub Pages URLs
+
+# 本体は Cloudflare Workers (tabigoyomi.com) で配信している。
+# GitHub Pages は旧URLからの転送専用ページだけを公開する。
 
 on:
   push:
@@ -22,12 +25,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+      - run: node scripts/build-redirect.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: redirect-dist
 
   deploy:
     needs: build

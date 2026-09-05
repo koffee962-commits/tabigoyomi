@@ -3,13 +3,13 @@
 世界の旅先、いちばんいい季節がひと目でわかる海外旅行ベストシーズン検索サイトです。
 20都市の月別の快適度・航空券の料金感・見どころ・予算のめやすを、東京発基準でまとめています。
 
-**公開URL:** https://koffee962-commits.github.io/tabigoyomi/
+**公開URL:** https://tabigoyomi.com/
 
 ## 開発コマンド
 
 ```bash
 npm install        # 依存パッケージのインストール
-npm run dev        # 開発サーバー起動 (http://localhost:5173/tabigoyomi/)
+npm run dev        # 開発サーバー起動 (http://localhost:5173/)
 npm run build      # 本番ビルド (vite build + scripts/postbuild.mjs)
 npm run preview    # ビルド結果のプレビュー
 ```
@@ -42,12 +42,11 @@ node scripts/fetch-photos.mjs   # public/photos/<id>.jpg と src/photoCredits.js
 
 ## 本番URL(ドメイン)の変更
 
-独自ドメインへ移行するときは以下の2箇所を変更します。
+ドメインを変えるときは以下を変更します。
 
-1. `src/data.js` の `SITE_ORIGIN` — canonical・OG・sitemap・robots がすべてここから生成されます
-2. `vite.config.js` の `base` — ドメイン直下で配信するなら `"/"` に変更
-
-あとは GitHub Pages のカスタムドメイン設定(または他ホスティングへの移行)を行うだけです。
+1. `src/data.js` の `SITE_ORIGIN` — canonical・OG・sitemap・robots・旧URLからの転送先がすべてここから生成されます
+2. `vite.config.js` の `base` — ドメイン直下で配信するなら `"/"`
+3. `wrangler.jsonc` の `routes` — 接続するカスタムドメイン
 
 ## アフィリエイトIDの設定
 
@@ -67,5 +66,19 @@ export const AFFILIATES = {
 
 ## デプロイ
 
-`main` ブランチに push すると GitHub Actions (`.github/workflows/deploy.yml`) が
-自動でビルドして GitHub Pages に公開します。
+本体は **Cloudflare Workers** (`tabigoyomi.com` / `www.tabigoyomi.com`) で配信しています。
+
+```bash
+npm run build          # 先にビルドが必要(dist/ を配信するため)
+npx wrangler deploy    # Cloudflare へ公開
+```
+
+`wrangler.jsonc` の `assets.not_found_handling` は `404-page` です。
+実在するルート(`/`・`/month`・`/my`・`/city/<id>`)はビルド時にHTMLを生成済みのため、
+それ以外のURLは 404 を返します(存在しないURLを200にしないため)。
+
+### GitHub Pages(旧URL)
+
+`main` に push すると GitHub Actions が `scripts/build-redirect.mjs` を実行し、
+旧URL `koffee962-commits.github.io/tabigoyomi/*` から新ドメインへ転送するページだけを公開します。
+サイト本体はここでは配信していません。

@@ -1,0 +1,14 @@
+{
+  "name": "tabigoyomi",
+  "compatibility_date": "2026-07-07",
+  "assets": {
+    "directory": "./dist",
+    // 実在ルート(/, /month, /my, /city/<id>)はビルド時にHTMLを生成済みなので、
+    // それ以外のURLは 404.html を404ステータスで返す(存在しないURLを200にしない)
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "tabigoyomi.com", "custom_domain": true },
+    { "pattern": "www.tabigoyomi.com", "custom_domain": true }
+  ]
+}
